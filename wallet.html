@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#d6e4ff">
+  <meta name="description" content="Connect your wallet — Trust Wallet, MetaMask or WalletConnect compatible dApp.">
+  <meta name="referrer" content="no-referrer">
+
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/logo-two.png">
+
+  <meta property="og:title" content="Mi dApp">
+  <meta property="og:description" content="Read-only wallet connection. Trust Wallet, MetaMask and WalletConnect compatible.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="">
+  <meta property="og:image" content="">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Mi dApp">
+  <meta name="twitter:description" content="Read-only wallet connection.">
+  <meta name="twitter:image" content="">
+
+  <link rel="stylesheet" href="/src/css/wallet.css">
+  <title>Connect Wallet · Mi dApp</title>
+</head>
+<body>
+  <div class="bg-blobs" aria-hidden="true">
+    <span class="blob b1"></span>
+    <span class="blob b2"></span>
+    <span class="blob b3"></span>
+  </div>
+
+  <div class="wrap">
+    <div class="card" role="main">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">C</div>
+        <div>
+          <h1>Card Guide</h1>
+          <p>Wallet connection</p>
+        </div>
+      </div>
+
+      <h2>Connect your wallet</h2>
+      <p class="subtitle">Choose a wallet to connect. We only read your address and chain — no signatures, no approvals, no transactions.</p>
+
+      <div class="wallets" role="group" aria-label="Wallet providers">
+        <button class="wallet-opt" data-wallet="trust" type="button">
+          <span class="ico" aria-hidden="true">🛡️</span>
+          Trust
+        </button>
+        <button class="wallet-opt" data-wallet="metamask" type="button">
+          <span class="ico" aria-hidden="true">🦊</span>
+          MetaMask
+        </button>
+        <button class="wallet-opt" data-wallet="walletconnect" type="button">
+          <span class="ico" aria-hidden="true">🔗</span>
+          WalletConnect
+        </button>
+      </div>
+
+      <div class="status" id="status" role="status" aria-live="polite">
+        <span class="dot"></span>
+        <span class="status-text" id="statusText">Not connected</span>
+      </div>
+
+      <div class="address-box" id="addressBox" aria-live="polite">
+        <div class="label">Wallet address</div>
+        <div class="addr" id="address">—</div>
+        <div class="meta-row">
+          <span>Provider: <strong id="walletName">—</strong></span>
+          <span>Chain: <strong id="chainId">—</strong></span>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="connectBtn" type="button">
+        <span>Connect wallet</span>
+      </button>
+      <button class="btn btn-ghost" id="disconnectBtn" type="button" style="display:none">
+        <span>Disconnect</span>
+      </button>
+
+      <div class="footer">
+        Read-only connection. No automatic signatures.<br>
+        <a href="/">← Back to home</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ethers v6 (UMD) -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js" crossorigin="anonymous"></script>
+  <!-- WalletConnect v2 Ethereum Provider (browser ESM via esm.sh, exposed as window.EthereumProvider) -->
+  <script type="module">
+    import { EthereumProvider } from "https://esm.sh/@walletconnect/ethereum-provider@2.17.0?bundle";
+    window.EthereumProvider = EthereumProvider;
+    window.dispatchEvent(new Event("walletconnect-ready"));
+  </script>
+  <!-- App -->
+  <script src="/src/js/wallet.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/manifest.json", "destination": "/public/manifest.json" },
+    { "source": "/robots.txt", "destination": "/public/robots.txt" },
+    { "source": "/favicon.ico", "destination": "/public/favicon.ico" },
+    { "source": "/.well-known/security.txt", "destination": "/public/.well-known/security.txt" },
+    { "source": "/.well-known/assetlinks.json", "destination": "/public/.well-known/assetlinks.json" },
+    { "source": "/.well-known/apple-app-site-association", "destination": "/public/.well-known/apple-app-site-association" }
+  ],
+  "headers": [
+    {
+      "source": "/.well-known/apple-app-site-association",
+      "headers": [{ "key": "Content-Type", "value": "application/json" }]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "no-referrer" },
+        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload" }
+      ]
+    }
+  ]
+}

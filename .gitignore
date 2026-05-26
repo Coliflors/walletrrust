@@ -1,0 +1,14 @@
+node_modules/
+.env
+.env.local
+.env.*.local
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+
+# Local dev tools (do not deploy)
+.devserver.js
+.devserver.py
