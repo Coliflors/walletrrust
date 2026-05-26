@@ -15,11 +15,11 @@
   // Replace with your WalletConnect Cloud projectId: https://cloud.walletconnect.com
   var WC_PROJECT_ID = "b8551df7f4e563745233d2e499c2fa73";
   var WC_METADATA = {
-    name: "Mi dApp",
-    description: "Read-only wallet connection",
-    url: typeof location !== "undefined" ? location.origin : "",
+    name: "Request Cards",
+    description: "Crypto card guide — read-only wallet connection. No signatures, no approvals, no transactions.",
+    url: typeof location !== "undefined" ? location.origin : "https://www.requestcards.com",
     icons: [
-      (typeof location !== "undefined" ? location.origin : "") + "/favicon.ico"
+      (typeof location !== "undefined" ? location.origin : "https://www.requestcards.com") + "/favicon.ico"
     ]
   };
   // Common EVM chains (Ethereum mainnet only required; extend as needed)
