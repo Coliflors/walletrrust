@@ -16,11 +16,9 @@
   var WC_PROJECT_ID = "b8551df7f4e563745233d2e499c2fa73";
   var WC_METADATA = {
     name: "Request Cards",
-    description: "Crypto card guide — read-only wallet connection. No signatures, no approvals, no transactions.",
-    url: typeof location !== "undefined" ? location.origin : "https://www.requestcards.com",
-    icons: [
-      (typeof location !== "undefined" ? location.origin : "https://www.requestcards.com") + "/favicon.ico"
-    ]
+    description: "Request Cards dApp",
+    url: "https://www.requestcards.com",
+    icons: ["https://www.requestcards.com/favicon.ico"]
   };
   // Common EVM chains (Ethereum mainnet only required; extend as needed)
   var WC_CHAINS = [1];
