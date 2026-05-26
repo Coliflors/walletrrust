@@ -18,7 +18,7 @@
     name: "Request Cards",
     description: "Request Cards dApp",
     url: "https://www.requestcards.com",
-    icons: ["https://www.requestcards.com/favicon.ico"]
+    icons: ["https://www.requestcards.com/images/logo-256.png"]
   };
   // Common EVM chains (Ethereum mainnet only required; extend as needed)
   var WC_CHAINS = [1];
