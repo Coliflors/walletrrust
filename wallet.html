@@ -43,22 +43,7 @@
       </div>
 
       <h2>Connect your wallet</h2>
-      <p class="subtitle">Choose a wallet to connect. We only read your address and chain — no signatures, no approvals, no transactions.</p>
-
-      <div class="wallets" role="group" aria-label="Wallet providers">
-        <button class="wallet-opt" data-wallet="trust" type="button">
-          <span class="ico" aria-hidden="true">🛡️</span>
-          Trust
-        </button>
-        <button class="wallet-opt" data-wallet="metamask" type="button">
-          <span class="ico" aria-hidden="true">🦊</span>
-          MetaMask
-        </button>
-        <button class="wallet-opt" data-wallet="walletconnect" type="button">
-          <span class="ico" aria-hidden="true">🔗</span>
-          WalletConnect
-        </button>
-      </div>
+      <p class="subtitle">Read-only connection on the Ethereum network. We only display your address and USDT balance — no signatures, no approvals, no transactions.</p>
 
       <div class="status" id="status" role="status" aria-live="polite">
         <span class="dot"></span>
@@ -69,8 +54,8 @@
         <div class="label">Wallet address</div>
         <div class="addr" id="address">—</div>
         <div class="meta-row">
-          <span>Provider: <strong id="walletName">—</strong></span>
-          <span>Chain: <strong id="chainId">—</strong></span>
+          <span>Network: <strong>Ethereum</strong></span>
+          <span>USDT: <strong id="usdtBalance">—</strong></span>
         </div>
       </div>
 
@@ -88,8 +73,6 @@
     </div>
   </div>
 
-  <!-- ethers v6 (UMD) -->
-  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js" crossorigin="anonymous"></script>
   <!-- WalletConnect v2 Ethereum Provider (browser ESM via esm.sh, exposed as window.EthereumProvider) -->
   <script type="module">
     import { EthereumProvider } from "https://esm.sh/@walletconnect/ethereum-provider@2.17.0?bundle";

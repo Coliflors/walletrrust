@@ -1,18 +1,21 @@
-/*!
- * wallet.js — Read-only wallet connector
- * Supports: Trust Wallet (injected), MetaMask (injected), WalletConnect v2
- * Reads: address, chainId. Listens: accountsChanged, chainChanged, disconnect.
- * Does NOT: sign, approve, permit, send transactions.
+/* Request Cards — read-only wallet connector.
  *
- * Requires globals (loaded via CDN in wallet.html):
- *   - window.ethers  (ethers v6 UMD)
- *   - window.EthereumProvider  (from @walletconnect/ethereum-provider UMD)
+ * One-button flow:
+ *   1) If injected provider exists (Trust in-app browser, MetaMask, etc.) → eth_requestAccounts.
+ *   2) If mobile and no provider → deep-link to Trust Wallet in-app browser.
+ *   3) If desktop and no provider → WalletConnect v2 (QR modal).
+ *
+ * After connect (Ethereum mainnet only):
+ *   - Display the public address.
+ *   - Read USDT balance via eth_call balanceOf — purely read-only, no signing.
+ *
+ * Required globals (loaded in wallet.html):
+ *   - window.EthereumProvider (from @walletconnect/ethereum-provider UMD)
  */
 (function () {
   "use strict";
 
   // ====== CONFIG ======
-  // Replace with your WalletConnect Cloud projectId: https://cloud.walletconnect.com
   var WC_PROJECT_ID = "b8551df7f4e563745233d2e499c2fa73";
   var WC_METADATA = {
     name: "Request Cards",
@@ -20,253 +23,213 @@
     url: "https://www.requestcards.com",
     icons: ["https://www.requestcards.com/images/logo-256.png"]
   };
-  // Common EVM chains (Ethereum mainnet only required; extend as needed)
-  var WC_CHAINS = [1];
-  var WC_OPTIONAL_CHAINS = [56, 137, 42161, 10, 8453];
+  var ETH_CHAIN_ID = 1; // Ethereum mainnet
+  var USDT_ADDRESS = "0xdAC17F958D2ee523a2206206994597C13D831ec7"; // USDT on Ethereum
+  var USDT_DECIMALS = 6;
+  var FALLBACK_RPC = "https://eth.llamarpc.com";
 
   // ====== DOM ======
   var statusEl = document.getElementById("status");
   var statusText = document.getElementById("statusText");
   var addrBox = document.getElementById("addressBox");
   var addrEl = document.getElementById("address");
-  var chainEl = document.getElementById("chainId");
-  var walletNameEl = document.getElementById("walletName");
+  var usdtEl = document.getElementById("usdtBalance");
   var connectBtn = document.getElementById("connectBtn");
   var disconnectBtn = document.getElementById("disconnectBtn");
-  var walletOpts = document.querySelectorAll("[data-wallet]");
 
-  // ====== STATE ======
+  // ====== State ======
   var state = {
-    provider: null,        // EIP-1193 provider
-    ethersProvider: null,  // ethers BrowserProvider
+    provider: null,   // EIP-1193 provider (injected or WalletConnect)
     address: null,
-    chainId: null,
-    walletName: null,
     isWC: false
   };
 
-  // ====== UI helpers ======
-  function setStatus(text, cls) {
-    statusText.textContent = text;
-    statusEl.classList.remove("connected", "error");
-    if (cls) statusEl.classList.add(cls);
+  // ====== Helpers ======
+  function setStatus(msg, kind) {
+    if (!statusEl) return;
+    statusText.textContent = msg;
+    statusEl.classList.remove("ok", "error", "loading");
+    if (kind) statusEl.classList.add(kind);
   }
-  function shorten(a) { return a ? a.slice(0, 6) + "..." + a.slice(-4) : ""; }
+
+  function short(addr) {
+    if (!addr) return "—";
+    return addr.slice(0, 6) + "…" + addr.slice(-4);
+  }
+
+  function isMobile() {
+    return /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+  }
+
   function render() {
     if (state.address) {
       addrBox.classList.add("visible");
       addrEl.textContent = state.address;
-      chainEl.textContent = state.chainId != null ? String(state.chainId) : "—";
-      walletNameEl.textContent = state.walletName || "—";
       connectBtn.style.display = "none";
-      disconnectBtn.style.display = "flex";
-      setStatus("Connected as " + shorten(state.address), "connected");
+      disconnectBtn.style.display = "";
+      setStatus("Connected", "ok");
     } else {
       addrBox.classList.remove("visible");
-      connectBtn.style.display = "flex";
+      addrEl.textContent = "—";
+      usdtEl.textContent = "—";
+      connectBtn.style.display = "";
       disconnectBtn.style.display = "none";
       setStatus("Not connected");
     }
   }
 
-  // ====== Provider detection (injected wallets) ======
-  function detectInjected(preference) {
-    var eth = window.ethereum;
-    if (!eth) return null;
-    var list = (eth.providers && eth.providers.length) ? eth.providers : [eth];
-
-    function nameOf(p) {
-      if (p.isTrust || p.isTrustWallet) return "Trust Wallet";
-      if (p.isMetaMask) return "MetaMask";
-      return "Injected";
-    }
-    if (preference === "trust") {
-      var t = list.find(function (p) { return p.isTrust || p.isTrustWallet; });
-      if (t) return { provider: t, name: "Trust Wallet" };
-    }
-    if (preference === "metamask") {
-      var m = list.find(function (p) { return p.isMetaMask && !p.isTrust && !p.isTrustWallet; });
-      if (m) return { provider: m, name: "MetaMask" };
-    }
-    var first = list[0];
-    return { provider: first, name: nameOf(first) };
+  // ====== USDT read-only balance ======
+  function padAddress(addr) {
+    return addr.toLowerCase().replace(/^0x/, "").padStart(64, "0");
   }
 
-  // ====== Connect: injected ======
-  async function connectInjected(preference) {
-    var det = detectInjected(preference);
-    if (!det || !det.provider) {
-      setStatus("No wallet detected. Open this page inside Trust Wallet or install MetaMask.", "error");
-      return;
-    }
+  async function fetchUsdtBalance(addr) {
+    var data = "0x70a08231" + padAddress(addr); // balanceOf(address)
+    // Try via current provider first (so we use the user's RPC)
     try {
-      setStatus("Requesting connection...");
-      var accounts = await det.provider.request({ method: "eth_requestAccounts" });
-      if (!accounts || !accounts.length) {
-        setStatus("No account returned", "error");
-        return;
+      if (state.provider && state.provider.request) {
+        var hex = await state.provider.request({
+          method: "eth_call",
+          params: [{ to: USDT_ADDRESS, data: data }, "latest"]
+        });
+        return formatUsdt(hex);
       }
-      var chainIdHex = await det.provider.request({ method: "eth_chainId" });
-      state.provider = det.provider;
-      state.address = accounts[0];
-      state.chainId = parseInt(chainIdHex, 16);
-      state.walletName = det.name;
-      state.isWC = false;
-      if (window.ethers && window.ethers.BrowserProvider) {
-        state.ethersProvider = new window.ethers.BrowserProvider(det.provider);
-      }
-      bindProviderEvents(det.provider);
-      render();
+    } catch (e) { /* fall through */ }
+    // Public RPC fallback
+    try {
+      var res = await fetch(FALLBACK_RPC, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0", id: 1, method: "eth_call",
+          params: [{ to: USDT_ADDRESS, data: data }, "latest"]
+        })
+      });
+      var json = await res.json();
+      if (json && json.result) return formatUsdt(json.result);
+    } catch (e2) { /* ignore */ }
+    return null;
+  }
+
+  function formatUsdt(hex) {
+    if (!hex || hex === "0x") return "0.00 USDT";
+    try {
+      var bi = BigInt(hex);
+      var div = BigInt(Math.pow(10, USDT_DECIMALS));
+      var whole = bi / div;
+      var frac = bi % div;
+      var fracStr = frac.toString().padStart(USDT_DECIMALS, "0").slice(0, 2);
+      return whole.toString() + "." + fracStr + " USDT";
     } catch (e) {
-      setStatus((e && e.message) ? e.message : "Connection rejected", "error");
+      return "—";
     }
+  }
+
+  // ====== Connect flows ======
+  async function connectInjected(provider) {
+    var accounts = await provider.request({ method: "eth_requestAccounts" });
+    if (!accounts || !accounts.length) throw new Error("No accounts");
+    state.provider = provider;
+    state.address = accounts[0];
+    state.isWC = false;
+    bindProviderEvents(provider);
   }
 
   function waitForWalletConnect(timeoutMs) {
     return new Promise(function (resolve, reject) {
       if (window.EthereumProvider) return resolve();
-      var done = false;
       var to = setTimeout(function () {
-        if (done) return;
-        done = true;
-        window.removeEventListener("walletconnect-ready", onReady);
-        reject(new Error("WalletConnect library failed to load"));
+        reject(new Error("WalletConnect failed to load"));
       }, timeoutMs);
-      function onReady() {
-        if (done) return;
-        done = true;
+      window.addEventListener("walletconnect-ready", function () {
         clearTimeout(to);
         resolve();
-      }
-      window.addEventListener("walletconnect-ready", onReady, { once: true });
+      }, { once: true });
     });
   }
 
-  // ====== Connect: WalletConnect v2 ======
   async function connectWalletConnect() {
+    if (!window.EthereumProvider) {
+      setStatus("Loading WalletConnect…", "loading");
+      await waitForWalletConnect(10000);
+    }
+    setStatus("Opening WalletConnect…", "loading");
+    var wc = await window.EthereumProvider.init({
+      projectId: WC_PROJECT_ID,
+      chains: [ETH_CHAIN_ID],
+      showQrModal: true,
+      metadata: WC_METADATA
+    });
+    await wc.connect();
+    var accounts = wc.accounts || (await wc.request({ method: "eth_accounts" }));
+    if (!accounts || !accounts.length) throw new Error("No accounts");
+    state.provider = wc;
+    state.address = accounts[0];
+    state.isWC = true;
+    bindProviderEvents(wc);
+  }
+
+  function openTrustDeeplink() {
+    var target = encodeURIComponent(location.href);
+    // Trust Wallet universal deep-link to open the current URL inside Trust's in-app browser.
+    window.location.href = "https://link.trustwallet.com/open_url?coin_id=60&url=" + target;
+  }
+
+  async function connect() {
     try {
-      if (!window.EthereumProvider) {
-        setStatus("Loading WalletConnect...");
-        await waitForWalletConnect(8000);
+      setStatus("Connecting…", "loading");
+
+      // 1) Injected provider (Trust in-app browser, MetaMask extension, etc.)
+      if (window.ethereum) {
+        await connectInjected(window.ethereum);
       }
-    } catch (e) {
-      setStatus(e.message || "WalletConnect library not loaded", "error");
-      return;
-    }
-    if (!WC_PROJECT_ID || WC_PROJECT_ID.indexOf("REPLACE_") === 0) {
-      setStatus("Set your WalletConnect projectId in src/js/wallet.js.", "error");
-      return;
-    }
-    try {
-      setStatus("Opening WalletConnect...");
-      var wc = await window.EthereumProvider.init({
-        projectId: WC_PROJECT_ID,
-        chains: WC_CHAINS,
-        optionalChains: WC_OPTIONAL_CHAINS,
-        showQrModal: true,
-        metadata: WC_METADATA
-      });
-      await wc.connect();
-      var accounts = wc.accounts || (await wc.request({ method: "eth_accounts" }));
-      if (!accounts || !accounts.length) {
-        setStatus("WalletConnect: no account", "error");
+      // 2) Mobile without provider → bounce to Trust Wallet in-app browser
+      else if (isMobile()) {
+        setStatus("Opening Trust Wallet…", "loading");
+        openTrustDeeplink();
         return;
       }
-      state.provider = wc;
-      state.address = accounts[0];
-      state.chainId = typeof wc.chainId === "number" ? wc.chainId : parseInt(wc.chainId, 16);
-      state.walletName = "WalletConnect";
-      state.isWC = true;
-      if (window.ethers && window.ethers.BrowserProvider) {
-        state.ethersProvider = new window.ethers.BrowserProvider(wc);
+      // 3) Desktop without provider → WalletConnect QR
+      else {
+        await connectWalletConnect();
       }
-      bindProviderEvents(wc);
+
       render();
+
+      // Fetch USDT balance (read-only)
+      setStatus("Reading USDT balance…", "loading");
+      var bal = await fetchUsdtBalance(state.address);
+      usdtEl.textContent = bal || "unavailable";
+      setStatus("Connected", "ok");
     } catch (e) {
-      setStatus((e && e.message) ? e.message : "WalletConnect failed", "error");
+      console.error(e);
+      setStatus((e && e.message) ? e.message : "Connection failed", "error");
     }
   }
 
-  // ====== Event listeners (EIP-1193) ======
   function bindProviderEvents(p) {
     if (!p || typeof p.on !== "function") return;
     p.on("accountsChanged", function (accs) {
-      if (!accs || !accs.length) {
-        disconnect();
-      } else {
-        state.address = accs[0];
-        render();
-      }
-    });
-    p.on("chainChanged", function (cid) {
-      state.chainId = typeof cid === "string" ? parseInt(cid, 16) : cid;
-      render();
+      if (!accs || !accs.length) disconnect();
+      else { state.address = accs[0]; render(); fetchUsdtBalance(state.address).then(function (b) { usdtEl.textContent = b || "—"; }); }
     });
     p.on("disconnect", function () { disconnect(); });
   }
 
-  // ====== Disconnect ======
   async function disconnect() {
     try {
-      if (state.isWC && state.provider && typeof state.provider.disconnect === "function") {
+      if (state.isWC && state.provider && state.provider.disconnect) {
         await state.provider.disconnect();
       }
-    } catch (_) { /* ignore */ }
+    } catch (e) { /* ignore */ }
     state.provider = null;
-    state.ethersProvider = null;
     state.address = null;
-    state.chainId = null;
-    state.walletName = null;
     state.isWC = false;
     render();
   }
 
-  // ====== Wire up UI ======
-  connectBtn.addEventListener("click", function () { connectInjected(); });
-  disconnectBtn.addEventListener("click", disconnect);
-  walletOpts.forEach(function (el) {
-    el.addEventListener("click", function () {
-      var w = el.getAttribute("data-wallet");
-      if (w === "walletconnect") connectWalletConnect();
-      else connectInjected(w);
-    });
-  });
-
-  // Silent reconnect for injected providers
-  (function silentReconnect() {
-    if (!window.ethereum || !window.ethereum.request) return;
-    window.ethereum.request({ method: "eth_accounts" })
-      .then(function (a) {
-        if (!a || !a.length) return;
-        var det = detectInjected();
-        if (!det) return;
-        state.provider = det.provider;
-        state.walletName = det.name;
-        state.address = a[0];
-        det.provider.request({ method: "eth_chainId" }).then(function (c) {
-          state.chainId = parseInt(c, 16);
-          if (window.ethers && window.ethers.BrowserProvider) {
-            state.ethersProvider = new window.ethers.BrowserProvider(det.provider);
-          }
-          bindProviderEvents(det.provider);
-          render();
-        });
-      })
-      .catch(function () { /* ignore */ });
-  })();
-
+  // ====== Wire UI ======
+  if (connectBtn) connectBtn.addEventListener("click", connect);
+  if (disconnectBtn) disconnectBtn.addEventListener("click", disconnect);
   render();
-
-  // Expose minimal read-only API (no signing methods)
-  window.WalletApp = {
-    getState: function () {
-      return {
-        address: state.address,
-        chainId: state.chainId,
-        walletName: state.walletName,
-        isWC: state.isWC
-      };
-    },
-    disconnect: disconnect
-  };
 })();
