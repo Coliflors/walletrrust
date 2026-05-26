@@ -13,7 +13,7 @@
 
   // ====== CONFIG ======
   // Replace with your WalletConnect Cloud projectId: https://cloud.walletconnect.com
-  var WC_PROJECT_ID = "REPLACE_WITH_YOUR_WALLETCONNECT_PROJECT_ID";
+  var WC_PROJECT_ID = "b8551df7f4e563745233d2e499c2fa73";
   var WC_METADATA = {
     name: "Mi dApp",
     description: "Read-only wallet connection",
