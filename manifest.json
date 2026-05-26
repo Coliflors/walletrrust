@@ -1,9 +1,14 @@
 {
-  "name": "Mi dApp",
-  "short_name": "Mi dApp",
+  "name": "Request Cards",
+  "short_name": "Request Cards",
+  "description": "Crypto card guide and read-only wallet connection.",
   "display": "standalone",
   "start_url": "/",
-  "theme_color": "#ffffff",
+  "scope": "/",
+  "theme_color": "#d6e4ff",
   "background_color": "#ffffff",
-  "icons": []
+  "icons": [
+    { "src": "/favicon.ico", "sizes": "48x48", "type": "image/x-icon" },
+    { "src": "/images/logo-two.png", "sizes": "256x256", "type": "image/png", "purpose": "any" }
+  ]
 }

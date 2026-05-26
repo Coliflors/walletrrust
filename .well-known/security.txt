@@ -1,1 +1,4 @@
-Contact: mailto:admin@midominio.com
+Contact: mailto:hello@requestcards.com
+Expires: 2027-05-26T08:00:23Z
+Preferred-Languages: en, es
+Canonical: https://www.requestcards.com/.well-known/security.txt
